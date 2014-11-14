@@ -1,0 +1,4 @@
+set x = 5
+set level = 500
+set x = level + 4 * x
+print x

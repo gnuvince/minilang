@@ -1,1 +1,4 @@
-print 1.2
+var x: int
+var y: float
+
+y = 1

@@ -1,3 +1,1 @@
-set _three = 3
-set x = 2 * (2+_three)
-print x
+print 1.2

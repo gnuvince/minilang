@@ -1,4 +1,13 @@
-set x = 5
-set level = 500
-set x = level + 4 * x
+var x: int
+var level: int
+var y: float
+var dy: float
+
+x = 5
+level = 500
+x = level + 4 * x
 print x
+
+y = 3.11
+dy = 0.04
+print y + dy

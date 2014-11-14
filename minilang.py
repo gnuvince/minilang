@@ -74,7 +74,7 @@ def lex(s):
         elif c == ":":
             tokens.append(tok(TOK_COLON, None))
 
-        # Integer literals
+        # Integer and float literals
         elif c.isdigit():
             num = ""
             while s[i].isdigit():
@@ -284,6 +284,21 @@ def build_symtab(ast):
 
 
 def typecheck(ast, symtab):
+    """
+    Input : the AST of a mini program and its associated symbol table
+    Output: an AST of the mini program, but with extra type
+    information added inside expression node
+
+    The typing rules of our small language are pretty simple:
+
+    - We have two types, int and float
+    - An int literal has type int
+    - A float literal has type float
+    - There is no automatic conversion from int to float (in fact, the
+      language does not support conversions)
+    - The two operands of an arithmetic operations must be of the same type
+    - An expression can be assigned to a variable only if their types are equal
+    """
     def check_stmt(stmt):
         if stmt["cat"] == AST_PRINT:
             typed_expr = check_expr(stmt["expr"])
@@ -322,12 +337,19 @@ def codegen(ast, symtab):
     Input : the AST and symbol table of a mini program
     Output: an equivalent C program
 
-    codegen(ast) will generate code in three-address code.
+    codegen(ast) will generate code in three-address code.  The code
+    is clearly not optimal, nor even really human readable, however it
+    is (a) correct, and (b) translated easily.
+
+    For expressions, we give the expression to translate, and the name
+    of the temporary in which the result should be put.  This result
+    will be used by the parent of the expression.  The new_temp() function
+    creates a new temporary variable for every time it's called.
     """
     def new_temp():
         global curr_tmp
         curr_tmp += 1
-        return "tmp_" + str(curr_tmp)
+        return "t_" + str(curr_tmp)
 
     def gen_stmt(stmt):
         if stmt["cat"] == AST_ASSIGN:

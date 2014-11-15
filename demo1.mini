@@ -1,4 +1,1 @@
-var x: int
-var y: float
-
-y = 1
+print 3 * (1 + 2)

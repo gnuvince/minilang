@@ -16,8 +16,7 @@ TOK_LPAREN = 9
 TOK_RPAREN = 10
 TOK_COLON  = 11
 
-# AST node categories (we use the word category to not be confused
-# with the word type)
+# AST nodes
 AST_DECL   = 0
 AST_ASSIGN = 1
 AST_PRINT  = 2
@@ -49,6 +48,13 @@ def lex(s):
     with the token, such as the name of an identifier or the value of
     an integer literal.  Some tokens, like the plus symbol, do not
     have an associated semantic value.
+
+    alpha ::= ['a'-'z'  'A'-'Z'  '_']
+    digit ::= ['0'-'9']
+    alnum ::= alpha | digit
+    int   ::= digit+
+    float ::= digit+ '.' digit*
+    ident ::= alpha alnum*
     """
     i = 0
     tokens = []
@@ -57,8 +63,7 @@ def lex(s):
 
         # Skip spaces
         if c.isspace():
-            i += 1
-            continue
+            pass
 
         # Operators and punctuation
         elif c == "=":
@@ -117,8 +122,11 @@ def parse(toks):
     Input : a list of tokens
     Output: a list of statement nodes
 
-    We parse the tokens according to the following grammar.  Every
-    non-terminal (left-hand side of a ::=) has its own local function
+    parse(toks) is a predictive, recursive-descent parser that will
+    return a list of AST nodes (declarations and statements) from the
+    token stream computer by lex() above.  We parse the tokens
+    according to the following grammar.  Every non-terminal (left-hand
+    side of a ::=) has its own local function
     definition.
 
         program  ::=  decls stmts
@@ -140,7 +148,7 @@ def parse(toks):
 
     The AST nodes are represented with dicts as follows:
     - Declarations
-        - var id: type   : { "cat": AST_DECL, id: "x", "type": type }
+        - var id: type   : { "cat": AST_DECL, "id": id, "type": type }
 
     - Statements
         - id = expr      : { "cat": AST_ASSIGN, "lhs": id, "rhs": expr }
@@ -160,10 +168,10 @@ def parse(toks):
         {
           "cat": AST_ASSIGN,
           "lhs": "x",
-          "expr": {
+          "rhs": {
             "cat": AST_ADD,
             "lhs": { "cat": AST_INT, "value": 3 },
-            "rhs": { "cat": AST_ID, "id": "y" }
+            "rhs": { "cat": AST_ID, "name": "y" }
           }
         }
     """
@@ -270,8 +278,9 @@ def build_symtab(ast):
     Input : the AST of a mini program
     Output: a dictionary mapping variable names to types
 
-    This procedure takes iterates over the declarations and adds them
-    to a symbol table.  If a variable is declared more than once, we
+    This procedure iterates over the declarations and adds them to a
+    symbol table (here, a dictionary that maps variable names to their
+    declared type).  If a variable is declared more than once, we
     report an error.
     """
     symtab = {}
@@ -351,6 +360,9 @@ def codegen(ast, symtab):
         curr_tmp += 1
         return "t_" + str(curr_tmp)
 
+    def gen_decl(decl):
+        return ["%s %s;" % (decl["type"], decl["id"])]
+
     def gen_stmt(stmt):
         if stmt["cat"] == AST_ASSIGN:
             if stmt["lhs"] not in symtab:
@@ -391,9 +403,9 @@ def codegen(ast, symtab):
     output += ["#include <stdio.h>"]
     output += ["int main(void) {"]
 
-    # Add the variable declarations
-    for var, ty in symtab.iteritems():
-        output += ["%s %s;" % (ty, var)]
+    # Add the variable declarations at the beginning of main.
+    for decl in ast["decls"]:
+        output += gen_decl(decl)
 
     # Add the C statements to the main function.
     for stmt in ast["stmts"]:

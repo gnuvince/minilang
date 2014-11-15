@@ -34,8 +34,8 @@ def error(msg):
 def tok(ty, val):
     return { "type": ty, "value": val }
 
-def astnode(cat, **args):
-    return dict(cat=cat, **args)
+def astnode(nodetype, **args):
+    return dict(nodetype=nodetype, **args)
 
 def lex(s):
     """
@@ -148,30 +148,30 @@ def parse(toks):
 
     The AST nodes are represented with dicts as follows:
     - Declarations
-        - var id: type   : { "cat": AST_DECL, "id": id, "type": type }
+        - var id: type   : { "nodetype": AST_DECL, "id": id, "type": type }
 
     - Statements
-        - id = expr      : { "cat": AST_ASSIGN, "lhs": id, "rhs": expr }
-        - print expr     : { "cat": AST_PRINT, "expr": expr }
+        - id = expr      : { "nodetype": AST_ASSIGN, "lhs": id, "rhs": expr }
+        - print expr     : { "nodetype": AST_PRINT, "expr": expr }
 
     - Expressions
-        - int            : { "cat": AST_INT, "value": int }
-        - float          : { "cat": AST_FLOAT, "value": float }
-        - id             : { "cat": AST_ID, "name": id }
-        - e1 + e2        : { "cat": AST_ADD, "lhs": e1, "rhs": e2 }
-        - e1 * e2        : { "cat": AST_MUL, "lhs": e1, "rhs": e2 }
+        - int            : { "nodetype": AST_INT, "value": int }
+        - float          : { "nodetype": AST_FLOAT, "value": float }
+        - id             : { "nodetype": AST_ID, "name": id }
+        - e1 + e2        : { "nodetype": AST_ADD, "lhs": e1, "rhs": e2 }
+        - e1 * e2        : { "nodetype": AST_MUL, "lhs": e1, "rhs": e2 }
 
     For example, here is a simple statement and its AST representation:
 
         x = 3 + y
 
         {
-          "cat": AST_ASSIGN,
+          "nodetype": AST_ASSIGN,
           "lhs": "x",
           "rhs": {
-            "cat": AST_ADD,
-            "lhs": { "cat": AST_INT, "value": 3 },
-            "rhs": { "cat": AST_ID, "name": "y" }
+            "nodetype": AST_ADD,
+            "lhs": { "nodetype": AST_INT, "value": 3 },
+            "rhs": { "nodetype": AST_ID, "name": "y" }
           }
         }
     """
@@ -309,10 +309,10 @@ def typecheck(ast, symtab):
     - An expression can be assigned to a variable only if their types are equal
     """
     def check_stmt(stmt):
-        if stmt["cat"] == AST_PRINT:
+        if stmt["nodetype"] == AST_PRINT:
             typed_expr = check_expr(stmt["expr"])
             return astnode(AST_PRINT, expr=typed_expr)
-        elif stmt["cat"] == AST_ASSIGN:
+        elif stmt["nodetype"] == AST_ASSIGN:
             typed_rhs = check_expr(stmt["rhs"])
             if typed_rhs["type"] == symtab[stmt["lhs"]]:
                 return astnode(AST_ASSIGN, lhs=stmt["lhs"], rhs=typed_rhs)
@@ -320,17 +320,17 @@ def typecheck(ast, symtab):
                 error("expected %s, got %s" % (symtab[stmt["lhs"]], typed_rhs["type"]))
 
     def check_expr(expr):
-        if expr["cat"] == AST_INT:
+        if expr["nodetype"] == AST_INT:
             return astnode(AST_INT, value=expr["value"], type="int")
-        elif expr["cat"] == AST_FLOAT:
+        elif expr["nodetype"] == AST_FLOAT:
             return astnode(AST_FLOAT, value=expr["value"], type="float")
-        elif expr["cat"] == AST_ID:
+        elif expr["nodetype"] == AST_ID:
             return astnode(AST_ID, name=expr["name"], type=symtab[expr["name"]])
-        elif expr["cat"] in (AST_ADD, AST_MUL):
+        elif expr["nodetype"] in (AST_ADD, AST_MUL):
             typed_e1 = check_expr(expr["lhs"])
             typed_e2 = check_expr(expr["rhs"])
             if typed_e1["type"] == typed_e2["type"]:
-                return astnode(expr["cat"], lhs=typed_e1, rhs=typed_e2, type=typed_e1["type"])
+                return astnode(expr["nodetype"], lhs=typed_e1, rhs=typed_e2, type=typed_e1["type"])
             else:
                 error("operands must have the same type")
 
@@ -364,13 +364,13 @@ def codegen(ast, symtab):
         return ["%s %s;" % (decl["type"], decl["id"])]
 
     def gen_stmt(stmt):
-        if stmt["cat"] == AST_ASSIGN:
+        if stmt["nodetype"] == AST_ASSIGN:
             if stmt["lhs"] not in symtab:
                 error("undeclared variable: %s" % stmt["lhs"])
             tmp = new_temp()
             expr_out = gen_expr(stmt["rhs"], tmp)
             return expr_out + ["%s = %s;" % (stmt["lhs"], tmp)]
-        elif stmt["cat"] == AST_PRINT:
+        elif stmt["nodetype"] == AST_PRINT:
             tmp = new_temp()
             expr_out = gen_expr(stmt["expr"], tmp)
             if stmt["expr"]["type"] == "int":
@@ -380,18 +380,18 @@ def codegen(ast, symtab):
             return expr_out + ['printf("%{flag}\\n", {tmp});'.format(flag=flag, tmp=tmp)]
 
     def gen_expr(expr, result_register):
-        if expr["cat"] in (AST_INT, AST_FLOAT):
+        if expr["nodetype"] in (AST_INT, AST_FLOAT):
             return ["%s %s = %s;" % (expr["type"], result_register, expr["value"])]
-        elif expr["cat"] == AST_ID:
+        elif expr["nodetype"] == AST_ID:
             if expr["name"] not in symtab:
                 error("undeclared variable: %s" % expr["name"])
             return ["%s %s = %s;" % (expr["type"], result_register, expr["name"])]
-        elif expr["cat"] in (AST_ADD, AST_MUL):
+        elif expr["nodetype"] in (AST_ADD, AST_MUL):
             t1 = new_temp()
             e1 = gen_expr(expr["lhs"], t1)
             t2 = new_temp()
             e2 = gen_expr(expr["rhs"], t2)
-            if expr["cat"] == AST_ADD:
+            if expr["nodetype"] == AST_ADD:
                 op = "+"
             else:
                 op = "*"

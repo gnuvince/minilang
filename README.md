@@ -11,3 +11,5 @@ gcc:
 
     $ python minilang.py < demos/demo1.mini | gcc -x c -o /tmp/demo1 -
     $ /tmp/demo1
+
+minilang.py should work with either Python 2 or Python 3.

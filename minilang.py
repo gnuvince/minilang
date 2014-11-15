@@ -11,10 +11,12 @@ TOK_FLOAT  = 4
 TOK_TYPE   = 5
 TOK_EQ     = 6
 TOK_PLUS   = 7
-TOK_STAR   = 8
-TOK_LPAREN = 9
-TOK_RPAREN = 10
-TOK_COLON  = 11
+TOK_MINUS  = 8
+TOK_STAR   = 9
+TOK_SLASH  = 10
+TOK_LPAREN = 11
+TOK_RPAREN = 12
+TOK_COLON  = 13
 
 # AST nodes
 AST_DECL   = 0
@@ -23,8 +25,7 @@ AST_PRINT  = 2
 AST_INT    = 3
 AST_FLOAT  = 4
 AST_ID     = 5
-AST_ADD    = 6
-AST_MUL    = 7
+AST_BINOP  = 6
 
 
 def error(msg):
@@ -70,8 +71,12 @@ def lex(s):
             tokens.append(tok(TOK_EQ, None))
         elif c == "+":
             tokens.append(tok(TOK_PLUS, None))
+        elif c == "-":
+            tokens.append(tok(TOK_MINUS, None))
         elif c == "*":
             tokens.append(tok(TOK_STAR, None))
+        elif c == "/":
+            tokens.append(tok(TOK_SLASH, None))
         elif c == "(":
             tokens.append(tok(TOK_LPAREN, None))
         elif c == ")":
@@ -138,8 +143,10 @@ def parse(toks):
         stmt     ::=  ident '=' expr
                    |  'print' expr
         expr     ::=  term '+' expr
+                   |  term '-' expr
                    |  term
         term     ::=  factor '*' term
+                   |  factor '-' term
                    |  factor
         factor   ::=  '(' expr ')'
                    |  ident
@@ -158,8 +165,7 @@ def parse(toks):
         - int            : { "nodetype": AST_INT, "value": int }
         - float          : { "nodetype": AST_FLOAT, "value": float }
         - id             : { "nodetype": AST_ID, "name": id }
-        - e1 + e2        : { "nodetype": AST_ADD, "lhs": e1, "rhs": e2 }
-        - e1 * e2        : { "nodetype": AST_MUL, "lhs": e1, "rhs": e2 }
+        - e1 + e2        : { "nodetype": AST_BINOP, op: "+", "lhs": e1, "rhs": e2 }
 
     For example, here is a simple statement and its AST representation:
 
@@ -169,7 +175,8 @@ def parse(toks):
           "nodetype": AST_ASSIGN,
           "lhs": "x",
           "rhs": {
-            "nodetype": AST_ADD,
+            "nodetype": AST_BINOP,
+            "op": "+",
             "lhs": { "nodetype": AST_INT, "value": 3 },
             "rhs": { "nodetype": AST_ID, "name": "y" }
           }
@@ -239,7 +246,11 @@ def parse(toks):
         if next_tok == TOK_PLUS:
             consume(TOK_PLUS)
             e = expr()
-            return astnode(AST_ADD, lhs=t, rhs=e)
+            return astnode(AST_BINOP, op="+", lhs=t, rhs=e)
+        elif next_tok == TOK_MINUS:
+            consume(TOK_MINUS)
+            e = expr()
+            return astnode(AST_BINOP, op="-", lhs=t, rhs=e)
         return t
 
     def term():
@@ -248,7 +259,11 @@ def parse(toks):
         if next_tok == TOK_STAR:
             consume(TOK_STAR)
             t = term()
-            return astnode(AST_MUL, lhs=f, rhs=t)
+            return astnode(AST_BINOP, op="*", lhs=f, rhs=t)
+        elif next_tok == TOK_SLASH:
+            consume(TOK_SLASH)
+            t = term()
+            return astnode(AST_BINOP, op="/", lhs=f, rhs=t)
         return f
 
     def factor():
@@ -326,11 +341,11 @@ def typecheck(ast, symtab):
             return astnode(AST_FLOAT, value=expr["value"], type="float")
         elif expr["nodetype"] == AST_ID:
             return astnode(AST_ID, name=expr["name"], type=symtab[expr["name"]])
-        elif expr["nodetype"] in (AST_ADD, AST_MUL):
+        elif expr["nodetype"] == AST_BINOP:
             typed_e1 = check_expr(expr["lhs"])
             typed_e2 = check_expr(expr["rhs"])
             if typed_e1["type"] == typed_e2["type"]:
-                return astnode(expr["nodetype"], lhs=typed_e1, rhs=typed_e2, type=typed_e1["type"])
+                return astnode(AST_BINOP, op=expr["op"], lhs=typed_e1, rhs=typed_e2, type=typed_e1["type"])
             else:
                 error("operands must have the same type")
 
@@ -386,16 +401,12 @@ def codegen(ast, symtab):
             if expr["name"] not in symtab:
                 error("undeclared variable: %s" % expr["name"])
             return ["%s %s = %s;" % (expr["type"], result_register, expr["name"])]
-        elif expr["nodetype"] in (AST_ADD, AST_MUL):
+        elif expr["nodetype"] == AST_BINOP:
             t1 = new_temp()
             e1 = gen_expr(expr["lhs"], t1)
             t2 = new_temp()
             e2 = gen_expr(expr["rhs"], t2)
-            if expr["nodetype"] == AST_ADD:
-                op = "+"
-            else:
-                op = "*"
-            return e1 + e2 + ["%s %s = %s %s %s;" % (expr["type"], result_register, t1, op, t2)]
+            return e1 + e2 + ["%s %s = %s %s %s;" % (expr["type"], result_register, t1, expr["op"], t2)]
 
     output = []
 

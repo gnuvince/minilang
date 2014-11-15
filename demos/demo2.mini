@@ -7,7 +7,8 @@ x = 5
 level = 500
 x = level + 4 * x
 print x
+print x / 40
 
-y = 3.11
-dy = 0.031592
-print y + dy
+y = 3.15
+dy = 0.01
+print y - dy

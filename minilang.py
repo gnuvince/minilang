@@ -35,7 +35,7 @@ def error(msg):
 def tok(ty, val):
     return { "type": ty, "value": val }
 
-def node(cat, **args):
+def astnode(cat, **args):
     return dict(cat=cat, **args)
 
 def lex(s):
@@ -86,11 +86,10 @@ def lex(s):
                 while s[i].isdigit():
                     num += s[i]
                     i += 1
-                i -= 1
                 tokens.append(tok(TOK_FLOAT, float(num)))
             else:
-                i -= 1
                 tokens.append(tok(TOK_INT, int(num)))
+            i -= 1 # Read one char too many, readjust.
 
         # Identifiers and keywords
         elif c.isalpha() or c == "_":
@@ -98,7 +97,7 @@ def lex(s):
             while s[i].isalnum() or s[i] == "_":
                 ident += s[i]
                 i += 1
-            i -= 1 # Read one char too many
+            i -= 1 # Read one char too many, readjust.
             if ident == "print":
                 tokens.append(tok(TOK_PRINT, None))
             elif ident == "var":
@@ -137,6 +136,7 @@ def parse(toks):
         factor   ::=  '(' expr ')'
                    |  ident
                    |  int
+                   |  float
 
     The AST nodes are represented with dicts as follows:
     - Declarations
@@ -190,10 +190,10 @@ def parse(toks):
         }
 
     def decls():
-        ds = []
+        decls = []
         while peek() == TOK_VAR:
-            ds.append(decl())
-        return ds
+            decls.append(decl())
+        return decls
 
     def decl():
         if peek() == TOK_VAR:
@@ -201,15 +201,15 @@ def parse(toks):
             id = consume(TOK_ID)
             consume(TOK_COLON)
             ty = consume(TOK_TYPE)
-            return node(AST_DECL, id=id["value"], type=ty["value"])
+            return astnode(AST_DECL, id=id["value"], type=ty["value"])
         else:
             error("not a valid declaration")
 
     def stmts():
-        ss = []
+        stmts = []
         while peek() in (TOK_PRINT, TOK_ID):
-            ss.append(stmt())
-        return ss
+            stmts.append(stmt())
+        return stmts
 
     def stmt():
         next_tok = peek()
@@ -217,11 +217,11 @@ def parse(toks):
             id = consume(TOK_ID)
             consume(TOK_EQ)
             e = expr()
-            return node(AST_ASSIGN, lhs=id["value"], rhs=e)
+            return astnode(AST_ASSIGN, lhs=id["value"], rhs=e)
         elif next_tok == TOK_PRINT:
             consume(TOK_PRINT)
             e = expr()
-            return node(AST_PRINT, expr=e)
+            return astnode(AST_PRINT, expr=e)
         else:
             error("illegal statement")
 
@@ -231,7 +231,7 @@ def parse(toks):
         if next_tok == TOK_PLUS:
             consume(TOK_PLUS)
             e = expr()
-            return node(AST_ADD, lhs=t, rhs=e)
+            return astnode(AST_ADD, lhs=t, rhs=e)
         return t
 
     def term():
@@ -240,7 +240,7 @@ def parse(toks):
         if next_tok == TOK_STAR:
             consume(TOK_STAR)
             t = term()
-            return node(AST_MUL, lhs=f, rhs=t)
+            return astnode(AST_MUL, lhs=f, rhs=t)
         return f
 
     def factor():
@@ -252,13 +252,13 @@ def parse(toks):
             return e
         elif next_tok == TOK_INT:
             tok = consume(TOK_INT)
-            return node(AST_INT, value=tok["value"])
+            return astnode(AST_INT, value=tok["value"])
         elif next_tok == TOK_FLOAT:
             tok = consume(TOK_FLOAT)
-            return node(AST_FLOAT, value=tok["value"])
+            return astnode(AST_FLOAT, value=tok["value"])
         elif next_tok == TOK_ID:
             tok = consume(TOK_ID)
-            return node(AST_ID, name=tok["value"])
+            return astnode(AST_ID, name=tok["value"])
         else:
             error("illegal token %d" % next_tok)
 
@@ -287,7 +287,7 @@ def typecheck(ast, symtab):
     """
     Input : the AST of a mini program and its associated symbol table
     Output: an AST of the mini program, but with extra type
-    information added inside expression node
+    information added inside expression nodes
 
     The typing rules of our small language are pretty simple:
 
@@ -302,26 +302,26 @@ def typecheck(ast, symtab):
     def check_stmt(stmt):
         if stmt["cat"] == AST_PRINT:
             typed_expr = check_expr(stmt["expr"])
-            return node(AST_PRINT, expr=typed_expr)
+            return astnode(AST_PRINT, expr=typed_expr)
         elif stmt["cat"] == AST_ASSIGN:
             typed_rhs = check_expr(stmt["rhs"])
             if typed_rhs["type"] == symtab[stmt["lhs"]]:
-                return node(AST_ASSIGN, lhs=stmt["lhs"], rhs=typed_rhs)
+                return astnode(AST_ASSIGN, lhs=stmt["lhs"], rhs=typed_rhs)
             else:
                 error("expected %s, got %s" % (symtab[stmt["lhs"]], typed_rhs["type"]))
 
     def check_expr(expr):
         if expr["cat"] == AST_INT:
-            return node(AST_INT, value=expr["value"], type="int")
+            return astnode(AST_INT, value=expr["value"], type="int")
         elif expr["cat"] == AST_FLOAT:
-            return node(AST_FLOAT, value=expr["value"], type="float")
+            return astnode(AST_FLOAT, value=expr["value"], type="float")
         elif expr["cat"] == AST_ID:
-            return node(AST_ID, name=expr["name"], type=symtab[expr["name"]])
+            return astnode(AST_ID, name=expr["name"], type=symtab[expr["name"]])
         elif expr["cat"] in (AST_ADD, AST_MUL):
             typed_e1 = check_expr(expr["lhs"])
             typed_e2 = check_expr(expr["rhs"])
             if typed_e1["type"] == typed_e2["type"]:
-                return node(expr["cat"], lhs=typed_e1, rhs=typed_e2, type=typed_e1["type"])
+                return astnode(expr["cat"], lhs=typed_e1, rhs=typed_e2, type=typed_e1["type"])
             else:
                 error("operands must have the same type")
 
@@ -341,8 +341,8 @@ def codegen(ast, symtab):
     is clearly not optimal, nor even really human readable, however it
     is (a) correct, and (b) translated easily.
 
-    For expressions, we give the expression to translate, and the name
-    of the temporary in which the result should be put.  This result
+    For expressions, we pass the expression to translate, and the name
+    of the temporary in which the result should be stored.  This result
     will be used by the parent of the expression.  The new_temp() function
     creates a new temporary variable for every time it's called.
     """
@@ -365,7 +365,7 @@ def codegen(ast, symtab):
                 flag = "d"
             else:
                 flag = "f"
-            return expr_out + ['printf("%%%s\\n", %s);' % (flag, tmp)]
+            return expr_out + ['printf("%{flag}\\n", {tmp});'.format(flag=flag, tmp=tmp)]
 
     def gen_expr(expr, result_register):
         if expr["cat"] in (AST_INT, AST_FLOAT):
@@ -410,9 +410,12 @@ def main():
     toks = lex(src)                      # source -> tokens
     ast = parse(toks)                    # tokens -> AST
     symtab = build_symtab(ast)           # AST -> symbol table
-    typed_ast = typecheck(ast, symtab)   # AST -> Typed AST
-    for s in codegen(typed_ast, symtab): # (Typed AST * symbol table) -> C code
-        print(s)
+    typed_ast = typecheck(ast, symtab)   # AST * symbol table -> Typed AST
+    c_stmts = codegen(typed_ast, symtab) # Typed AST * symbol table -> C code
+
+    for stmt in c_stmts:
+        print(stmt)
+
 
 if __name__ == "__main__":
     main()

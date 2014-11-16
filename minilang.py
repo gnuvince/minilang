@@ -169,7 +169,7 @@ def parse(toks):
         program  ::=  decls stmts
         decls    ::=  decl decls
                    |  ε
-        decl     ::=  ident ':' type
+        decl     ::=  'var' ident ':' type
         stmts    ::=  stmt stmts
                    |  ε
         stmt     ::=  ident '=' expr

@@ -76,12 +76,13 @@ def lex(s):
     an integer literal.  Some tokens, like the plus symbol, do not
     have an associated semantic value.
 
-    alpha ::= ['a'-'z'  'A'-'Z'  '_']
-    digit ::= ['0'-'9']
-    alnum ::= alpha | digit
-    int   ::= digit+
-    float ::= digit+ '.' digit*
-    ident ::= alpha alnum*
+    alpha   ::= ['a'-'z'  'A'-'Z'  '_']
+    digit   ::= ['0'-'9']
+    alnum   ::= alpha | digit
+    int     ::= digit+
+    float   ::= digit+ '.' digit*
+    keyword ::= "var" | "print" | "if" | "then" | "else" | "int" | "float"
+    ident   ::= alpha alnum*
     """
     i = 0
     tokens = []

@@ -164,11 +164,11 @@ def parse(toks):
                    |  ε
         stmt     ::=  ident '=' expr
                    |  'print' expr
-        expr     ::=  term '+' expr
-                   |  term '-' expr
+        expr     ::=  term { '+' expr }
+                   |  term { '-' expr }
                    |  term
-        term     ::=  factor '*' term
-                   |  factor '-' term
+        term     ::=  factor { '*' term }
+                   |  factor { '-' term }
                    |  factor
         factor   ::=  '(' expr ')'
                    |  ident
@@ -265,27 +265,31 @@ def parse(toks):
     def expr():
         t = term()
         next_tok = peek()
-        if next_tok == TOK_PLUS:
-            consume(TOK_PLUS)
-            e = expr()
-            return astnode(AST_BINOP, op="+", lhs=t, rhs=e)
-        elif next_tok == TOK_MINUS:
-            consume(TOK_MINUS)
-            e = expr()
-            return astnode(AST_BINOP, op="-", lhs=t, rhs=e)
+        while next_tok in (TOK_PLUS, TOK_MINUS):
+            if next_tok == TOK_PLUS:
+                consume(TOK_PLUS)
+                t2 = term()
+                t = astnode(AST_BINOP, op="+", lhs=t, rhs=t2)
+            elif next_tok == TOK_MINUS:
+                consume(TOK_MINUS)
+                t2 = term()
+                t = astnode(AST_BINOP, op="-", lhs=t, rhs=t2)
+            next_tok = peek()
         return t
 
     def term():
         f = factor()
         next_tok = peek()
-        if next_tok == TOK_STAR:
-            consume(TOK_STAR)
-            t = term()
-            return astnode(AST_BINOP, op="*", lhs=f, rhs=t)
-        elif next_tok == TOK_SLASH:
-            consume(TOK_SLASH)
-            t = term()
-            return astnode(AST_BINOP, op="/", lhs=f, rhs=t)
+        while next_tok in (TOK_STAR, TOK_SLASH):
+            if next_tok == TOK_STAR:
+                consume(TOK_STAR)
+                f2 = factor()
+                f = astnode(AST_BINOP, op="*", lhs=f, rhs=f2)
+            elif next_tok == TOK_SLASH:
+                consume(TOK_SLASH)
+                f2 = factor()
+                f = astnode(AST_BINOP, op="/", lhs=f, rhs=f2)
+            next_tok = peek()
         return f
 
     def factor():

@@ -188,17 +188,18 @@ def parse(toks):
 
     The AST nodes are represented with dicts as follows:
     - Declarations
-        - var id: type   : { "nodetype": AST_DECL, "id": id, "type": type }
+        - var id               : type   : { "nodetype": AST_DECL, "id": id, "type": type }
 
     - Statements
-        - id = expr      : { "nodetype": AST_ASSIGN, "lhs": id, "rhs": expr }
-        - print expr     : { "nodetype": AST_PRINT, "expr": expr }
+        - id = expr            : { "nodetype": AST_ASSIGN, "lhs": id, "rhs": expr }
+        - print expr           : { "nodetype": AST_PRINT, "expr": expr }
+        - if e then s1 else s2 : { "nodetype": AST_IF, "expr": e, "then_stmt": s1, "else_stmt": s2 }
 
     - Expressions
-        - int            : { "nodetype": AST_INT, "value": int }
-        - float          : { "nodetype": AST_FLOAT, "value": float }
-        - id             : { "nodetype": AST_ID, "name": id }
-        - e1 + e2        : { "nodetype": AST_BINOP, op: "+", "lhs": e1, "rhs": e2 }
+        - int                  : { "nodetype": AST_INT, "value": int }
+        - float                : { "nodetype": AST_FLOAT, "value": float }
+        - id                   : { "nodetype": AST_ID, "name": id }
+        - e1 + e2              : { "nodetype": AST_BINOP, op: "+", "lhs": e1, "rhs": e2 }
 
     For example, here is a simple statement and its AST representation:
 

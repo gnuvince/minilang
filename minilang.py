@@ -188,7 +188,7 @@ def parse(toks):
 
     The AST nodes are represented with dicts as follows:
     - Declarations
-        - var id               : type   : { "nodetype": AST_DECL, "id": id, "type": type }
+        - var id: type         : { "nodetype": AST_DECL, "id": id, "type": type }
 
     - Statements
         - id = expr            : { "nodetype": AST_ASSIGN, "lhs": id, "rhs": expr }

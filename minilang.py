@@ -59,7 +59,7 @@ def error(msg):
     sys.exit(1)
 
 def tok(ty, val):
-    return { "type": ty, "value": val }
+    return { "toktype": ty, "value": val }
 
 def astnode(nodetype, **args):
     return dict(nodetype=nodetype, **args)
@@ -219,15 +219,15 @@ def parse(toks):
     """
 
     def consume(tok_type):
-        if tok_type == toks[0]["type"]:
+        if tok_type == toks[0]["toktype"]:
             t = toks.pop(0)
             return t
         else:
-            error("expected %d, found %d" % (tok_type, toks[0]["type"]))
+            error("expected %d, found %d" % (tok_type, toks[0]["toktype"]))
 
     def peek():
         if toks:
-            return toks[0]["type"]
+            return toks[0]["toktype"]
         else:
             return None
 

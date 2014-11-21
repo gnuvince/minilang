@@ -164,8 +164,7 @@ def parse(toks):
     return a list of AST nodes (declarations and statements) from the
     token stream computer by lex() above.  We parse the tokens
     according to the following grammar.  Every non-terminal (left-hand
-    side of a ::=) has its own local function
-    definition.
+    side of a ::=) has its own local function definition.
 
         program  ::=  decls stmts
         decls    ::=  decl decls
@@ -436,37 +435,36 @@ def codegen(ast, symtab):
         if stmt["nodetype"] == AST_ASSIGN:
             if stmt["lhs"] not in symtab:
                 error("undeclared variable: %s" % stmt["lhs"])
-            tmp = new_temp()
-            expr_out = gen_expr(stmt["rhs"], tmp)
-            return expr_out + ["%s = %s;" % (stmt["lhs"], tmp)]
+            expr_loc, expr_out = gen_expr(stmt["rhs"])
+            return expr_out + ["%s = %s;" % (stmt["lhs"], expr_loc)]
         elif stmt["nodetype"] == AST_PRINT:
-            tmp = new_temp()
-            expr_out = gen_expr(stmt["expr"], tmp)
+            expr_loc, expr_out = gen_expr(stmt["expr"])
             if stmt["expr"]["type"] == "int":
                 flag = "d"
             else:
                 flag = "f"
-            return expr_out + ['printf("%{flag}\\n", {tmp});'.format(flag=flag, tmp=tmp)]
+            return expr_out + ['printf("%{flag}\\n", {tmp});'.format(flag=flag, tmp=expr_loc)]
         elif stmt["nodetype"] == AST_IF:
-            tmp = new_temp()
-            expr_out = gen_expr(stmt["expr"], tmp)
+            expr_loc, expr_out = gen_expr(stmt["expr"])
             then_out = gen_stmt(stmt["then_stmt"])
             else_out = gen_stmt(stmt["else_stmt"])
-            return expr_out + ["if (%s) { %s } else { %s }" % (tmp, '\n'.join(then_out), '\n'.join(else_out))]
+            return expr_out + ["if (%s) { %s } else { %s }" % (expr_loc, '\n'.join(then_out), '\n'.join(else_out))]
 
-    def gen_expr(expr, result_register):
+    def gen_expr(expr):
         if expr["nodetype"] in (AST_INT, AST_FLOAT):
-            return ["%s %s = %s;" % (expr["type"], result_register, expr["value"])]
+            loc = new_temp()
+            code = ["%s %s = %s;" % (expr["type"], loc, expr["value"])]
+            return (loc, code)
         elif expr["nodetype"] == AST_ID:
             if expr["name"] not in symtab:
                 error("undeclared variable: %s" % expr["name"])
-            return ["%s %s = %s;" % (expr["type"], result_register, expr["name"])]
+            return (expr["name"], [])
         elif expr["nodetype"] == AST_BINOP:
-            t1 = new_temp()
-            e1 = gen_expr(expr["lhs"], t1)
-            t2 = new_temp()
-            e2 = gen_expr(expr["rhs"], t2)
-            return e1 + e2 + ["%s %s = %s %s %s;" % (expr["type"], result_register, t1, expr["op"], t2)]
+            lhs_loc, lhs_code = gen_expr(expr["lhs"])
+            rhs_loc, rhs_code = gen_expr(expr["rhs"])
+            loc = new_temp()
+            code = lhs_code + rhs_code + ["%s %s = %s %s %s;" % (expr["type"], loc, lhs_loc, expr["op"], rhs_loc)]
+            return (loc, code)
 
     output = []
 

@@ -418,10 +418,11 @@ def codegen(ast, symtab):
     is clearly not optimal, nor even really human readable, however it
     is (a) correct, and (b) translated easily.
 
-    For expressions, we pass the expression to translate, and the name
-    of the temporary in which the result should be stored.  This result
-    will be used by the parent of the expression.  The new_temp() function
-    creates a new temporary variable for every time it's called.
+    For expressions, we pass the expression to translate, and
+    gen_expr() returns two results: the name of the variable in which
+    the result should be stored and the code to compute the result.
+    The new_temp() function creates a new temporary variable for every
+    time it's called.
     """
     def new_temp():
         global curr_tmp

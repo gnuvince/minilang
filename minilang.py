@@ -393,6 +393,8 @@ def typecheck(ast, symtab):
         elif expr["nodetype"] == AST_FLOAT:
             return astnode(AST_FLOAT, value=expr["value"], type="float")
         elif expr["nodetype"] == AST_ID:
+            if expr["name"] not in symtab:
+                error("undeclared variable: %s" % expr["name"])
             return astnode(AST_ID, name=expr["name"], type=symtab[expr["name"]])
         elif expr["nodetype"] == AST_BINOP:
             typed_e1 = check_expr(expr["lhs"])
@@ -457,8 +459,6 @@ def codegen(ast, symtab):
             code = ["%s %s = %s;" % (expr["type"], loc, expr["value"])]
             return (loc, code)
         elif expr["nodetype"] == AST_ID:
-            if expr["name"] not in symtab:
-                error("undeclared variable: %s" % expr["name"])
             return (expr["name"], [])
         elif expr["nodetype"] == AST_BINOP:
             lhs_loc, lhs_code = gen_expr(expr["lhs"])

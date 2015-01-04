@@ -1,0 +1,16 @@
+var x: float
+var guess: float
+var quot: float
+var iter: int
+
+x = 80.0
+guess = 1.0
+iter = 10
+
+while iter do
+  quot = x / guess
+  guess = 0.5 * (guess + quot)
+  iter = iter - 1
+done
+
+print guess

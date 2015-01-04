@@ -39,9 +39,9 @@ TOK_SLASH  = 10
 TOK_LPAREN = 11
 TOK_RPAREN = 12
 TOK_COLON  = 13
-TOK_IF     = 14
-TOK_THEN   = 15
-TOK_ELSE   = 16
+TOK_WHILE  = 14
+TOK_DO     = 15
+TOK_DONE   = 16
 
 # AST nodes
 AST_DECL   = 0
@@ -51,7 +51,7 @@ AST_INT    = 3
 AST_FLOAT  = 4
 AST_ID     = 5
 AST_BINOP  = 6
-AST_IF     = 7
+AST_WHILE  = 7
 
 
 def error(msg):
@@ -81,7 +81,7 @@ def lex(s):
     alnum   ::= alpha | digit
     int     ::= digit+
     float   ::= digit+ '.' digit*
-    keyword ::= "var" | "print" | "if" | "then" | "else" | "int" | "float"
+    keyword ::= "var" | "print" | "while" | "do" | "done" | "int" | "float"
     ident   ::= alpha alnum*
     """
     i = 0
@@ -139,12 +139,12 @@ def lex(s):
                 tokens.append(tok(TOK_PRINT, None))
             elif ident == "var":
                 tokens.append(tok(TOK_VAR, None))
-            elif ident == "if":
-                tokens.append(tok(TOK_IF, None))
-            elif ident == "then":
-                tokens.append(tok(TOK_THEN, None))
-            elif ident == "else":
-                tokens.append(tok(TOK_ELSE, None))
+            elif ident == "while":
+                tokens.append(tok(TOK_WHILE, None))
+            elif ident == "do":
+                tokens.append(tok(TOK_DO, None))
+            elif ident == "done":
+                tokens.append(tok(TOK_DONE, None))
             elif ident in ("int", "float"):
                 tokens.append(tok(TOK_TYPE, ident))
             else:
@@ -174,7 +174,7 @@ def parse(toks):
                    |  ε
         stmt     ::=  ident '=' expr
                    |  'print' expr
-                   |  'if' expr 'then' stmt 'else' stmt
+                   |  'while' expr 'do' stmts 'done'
         expr     ::=  term { '+' expr }
                    |  term { '-' expr }
                    |  term
@@ -193,7 +193,7 @@ def parse(toks):
     - Statements
         - id = expr            : { "nodetype": AST_ASSIGN, "lhs": id, "rhs": expr }
         - print expr           : { "nodetype": AST_PRINT, "expr": expr }
-        - if e then s1 else s2 : { "nodetype": AST_IF, "expr": e, "then_stmt": s1, "else_stmt": s2 }
+        - while e do stmts done: { "nodetype": AST_WHILE, "expr": e, "body": stmts }
 
     - Expressions
         - int                  : { "nodetype": AST_INT, "value": int }
@@ -256,7 +256,7 @@ def parse(toks):
 
     def stmts():
         stmts = []
-        while peek() in (TOK_PRINT, TOK_ID, TOK_IF):
+        while peek() in (TOK_PRINT, TOK_ID, TOK_WHILE):
             stmts.append(stmt())
         return stmts
 
@@ -271,14 +271,13 @@ def parse(toks):
             consume(TOK_PRINT)
             e = expr()
             return astnode(AST_PRINT, expr=e)
-        elif next_tok == TOK_IF:
-            consume(TOK_IF)
+        elif next_tok == TOK_WHILE:
+            consume(TOK_WHILE)
             e = expr()
-            consume(TOK_THEN)
-            then_stmt = stmt()
-            consume(TOK_ELSE)
-            else_stmt = stmt()
-            return astnode(AST_IF, expr=e, then_stmt=then_stmt, else_stmt=else_stmt)
+            consume(TOK_DO)
+            body = stmts()
+            consume(TOK_DONE)
+            return astnode(AST_WHILE, expr=e, body=body)
         else:
             error("illegal statement")
 
@@ -379,13 +378,12 @@ def typecheck(ast, symtab):
                 return astnode(AST_ASSIGN, lhs=stmt["lhs"], rhs=typed_rhs)
             else:
                 error("expected %s, got %s" % (symtab[stmt["lhs"]], typed_rhs["type"]))
-        elif stmt["nodetype"] == AST_IF:
+        elif stmt["nodetype"] == AST_WHILE:
             typed_expr = check_expr(stmt["expr"])
             if typed_expr["type"] != "int":
-                error("if condition must be an int")
-            typed_then = check_stmt(stmt["then_stmt"])
-            typed_else = check_stmt(stmt["else_stmt"])
-            return astnode(AST_IF, expr=typed_expr, then_stmt=typed_then, else_stmt=typed_else)
+                error("loop condition must be an int")
+            typed_body = [check_stmt(body_stmt) for body_stmt in stmt["body"]]
+            return astnode(AST_WHILE, expr=typed_expr, body=typed_body)
 
     def check_expr(expr):
         if expr["nodetype"] == AST_INT:
@@ -447,11 +445,12 @@ def codegen(ast, symtab):
             else:
                 flag = "f"
             return expr_out + ['printf("%{flag}\\n", {tmp});'.format(flag=flag, tmp=expr_loc)]
-        elif stmt["nodetype"] == AST_IF:
+        elif stmt["nodetype"] == AST_WHILE:
             expr_loc, expr_out = gen_expr(stmt["expr"])
-            then_out = gen_stmt(stmt["then_stmt"])
-            else_out = gen_stmt(stmt["else_stmt"])
-            return expr_out + ["if (%s) { %s } else { %s }" % (expr_loc, '\n'.join(then_out), '\n'.join(else_out))]
+            body_out = []
+            for body_stmt in stmt["body"]:
+                body_out += gen_stmt(body_stmt)
+            return expr_out + ["while (%s) { %s }" % (expr_loc, '\n'.join(body_out + expr_out))]
 
     def gen_expr(expr):
         if expr["nodetype"] in (AST_INT, AST_FLOAT):
@@ -488,6 +487,7 @@ def codegen(ast, symtab):
 
 
 def main():
+    import pprint
     src = sys.stdin.read()
     toks = lex(src)                      # source -> tokens
     ast = parse(toks)                    # tokens -> AST

@@ -1,0 +1,17 @@
+var a: int
+var b: int
+var n: int
+var t: int
+
+a = 0
+b = 1
+n = 10
+
+while n do
+  t = a
+  a = b
+  b = b + t
+  n = n - 1
+done
+
+print a

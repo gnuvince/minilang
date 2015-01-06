@@ -487,7 +487,6 @@ def codegen(ast, symtab):
 
 
 def main():
-    import pprint
     src = sys.stdin.read()
     toks = lex(src)                      # source -> tokens
     ast = parse(toks)                    # tokens -> AST

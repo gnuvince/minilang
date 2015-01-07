@@ -42,6 +42,7 @@ TOK_COLON  = 13
 TOK_WHILE  = 14
 TOK_DO     = 15
 TOK_DONE   = 16
+TOK_SEMI   = 17
 
 # AST nodes
 AST_DECL   = 0
@@ -93,6 +94,11 @@ def lex(s):
         if c.isspace():
             pass
 
+        # Skip comments
+        elif c == "#":
+            while s[i] != "\n":
+                i += 1
+
         # Operators and punctuation
         elif c == "=":
             tokens.append(tok(TOK_EQ, None))
@@ -110,6 +116,8 @@ def lex(s):
             tokens.append(tok(TOK_RPAREN, None))
         elif c == ":":
             tokens.append(tok(TOK_COLON, None))
+        elif c == ";":
+            tokens.append(tok(TOK_SEMI, None))
 
         # Integer and float literals
         elif c.isdigit():
@@ -169,11 +177,11 @@ def parse(toks):
         program  ::=  decls stmts
         decls    ::=  decl decls
                    |  ε
-        decl     ::=  'var' ident ':' type
+        decl     ::=  'var' ident ':' type ';'
         stmts    ::=  stmt stmts
                    |  ε
-        stmt     ::=  ident '=' expr
-                   |  'print' expr
+        stmt     ::=  ident '=' expr ';'
+                   |  'print' expr ';'
                    |  'while' expr 'do' stmts 'done'
         expr     ::=  term { '+' expr }
                    |  term { '-' expr }
@@ -250,6 +258,7 @@ def parse(toks):
             id = consume(TOK_ID)
             consume(TOK_COLON)
             ty = consume(TOK_TYPE)
+            consume(TOK_SEMI)
             return astnode(AST_DECL, id=id["value"], type=ty["value"])
         else:
             error("not a valid declaration")
@@ -266,10 +275,12 @@ def parse(toks):
             id = consume(TOK_ID)
             consume(TOK_EQ)
             e = expr()
+            consume(TOK_SEMI)
             return astnode(AST_ASSIGN, lhs=id["value"], rhs=e)
         elif next_tok == TOK_PRINT:
             consume(TOK_PRINT)
             e = expr()
+            consume(TOK_SEMI)
             return astnode(AST_PRINT, expr=e)
         elif next_tok == TOK_WHILE:
             consume(TOK_WHILE)

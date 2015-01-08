@@ -5,7 +5,7 @@ var guess: float;
 var quot: float;
 var iter: int;
 
-x = 80.0;
+read x;
 guess = 1.0;
 iter = 10;
 
@@ -16,3 +16,4 @@ while iter do
 done
 
 print guess;
+print guess * guess;

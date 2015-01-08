@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Vincent Foley-Bourgon
+# Copyright (c) 2014-2015 Vincent Foley-Bourgon
 
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -43,6 +43,7 @@ TOK_WHILE  = 14
 TOK_DO     = 15
 TOK_DONE   = 16
 TOK_SEMI   = 17
+TOK_READ   = 18
 
 # AST nodes
 AST_DECL   = 0
@@ -53,6 +54,7 @@ AST_FLOAT  = 4
 AST_ID     = 5
 AST_BINOP  = 6
 AST_WHILE  = 7
+AST_READ   = 8
 
 
 def error(msg):
@@ -82,7 +84,7 @@ def lex(s):
     alnum   ::= alpha | digit
     int     ::= digit+
     float   ::= digit+ '.' digit*
-    keyword ::= "var" | "print" | "while" | "do" | "done" | "int" | "float"
+    keyword ::= "var" | "print" | "read" | "while" | "do" | "done" | "int" | "float"
     ident   ::= alpha alnum*
     """
     i = 0
@@ -145,6 +147,8 @@ def lex(s):
             i -= 1 # Read one char too many, readjust.
             if ident == "print":
                 tokens.append(tok(TOK_PRINT, None))
+            elif ident == "read":
+                tokens.append(tok(TOK_READ, None))
             elif ident == "var":
                 tokens.append(tok(TOK_VAR, None))
             elif ident == "while":
@@ -181,6 +185,7 @@ def parse(toks):
         stmts    ::=  stmt stmts
                    |  ε
         stmt     ::=  ident '=' expr ';'
+                   |  'read' ident ';'
                    |  'print' expr ';'
                    |  'while' expr 'do' stmts 'done'
         expr     ::=  term { '+' expr }
@@ -201,6 +206,7 @@ def parse(toks):
     - Statements
         - id = expr            : { "nodetype": AST_ASSIGN, "lhs": id, "rhs": expr }
         - print expr           : { "nodetype": AST_PRINT, "expr": expr }
+        - read id              : { "nodetype": AST_READ, "id": id }
         - while e do stmts done: { "nodetype": AST_WHILE, "expr": e, "body": stmts }
 
     - Expressions
@@ -265,7 +271,7 @@ def parse(toks):
 
     def stmts():
         stmts = []
-        while peek() in (TOK_PRINT, TOK_ID, TOK_WHILE):
+        while peek() in (TOK_PRINT, TOK_READ, TOK_ID, TOK_WHILE):
             stmts.append(stmt())
         return stmts
 
@@ -282,6 +288,11 @@ def parse(toks):
             e = expr()
             consume(TOK_SEMI)
             return astnode(AST_PRINT, expr=e)
+        elif next_tok == TOK_READ:
+            consume(TOK_READ)
+            id = consume(TOK_ID)
+            consume(TOK_SEMI)
+            return astnode(AST_READ, id=id)
         elif next_tok == TOK_WHILE:
             consume(TOK_WHILE)
             e = expr()
@@ -383,6 +394,8 @@ def typecheck(ast, symtab):
         if stmt["nodetype"] == AST_PRINT:
             typed_expr = check_expr(stmt["expr"])
             return astnode(AST_PRINT, expr=typed_expr)
+        elif stmt["nodetype"] == AST_READ:
+            return astnode(AST_READ, id=stmt["id"])
         elif stmt["nodetype"] == AST_ASSIGN:
             typed_rhs = check_expr(stmt["rhs"])
             if typed_rhs["type"] == symtab[stmt["lhs"]]:
@@ -456,6 +469,13 @@ def codegen(ast, symtab):
             else:
                 flag = "f"
             return expr_out + ['printf("%{flag}\\n", {tmp});'.format(flag=flag, tmp=expr_loc)]
+        elif stmt["nodetype"] == AST_READ:
+            id = stmt["id"]["value"]
+            if symtab[id] == "int":
+                flag = "d"
+            else:
+                flag = "f"
+            return ['scanf("%%%s", &%s);' % (flag, id)]
         elif stmt["nodetype"] == AST_WHILE:
             expr_loc, expr_out = gen_expr(stmt["expr"])
             body_out = []

@@ -74,10 +74,20 @@ def lex(s):
 
     lex(s) will produce a sequence of tokens, which are dicts with two
     bindings: the type of the token (as defined above) and a semantic
-    value.  The semantic value is a piece of information associated
-    with the token, such as the name of an identifier or the value of
-    an integer literal.  Some tokens, like the plus symbol, do not
-    have an associated semantic value.
+    value.  The semantic value (also called lexeme) is a piece of
+    information associated with the token, such as the name of an
+    identifier or the value of an integer literal.  Some tokens, like
+    the plus symbol, do not have an associated semantic value.
+
+    Example:
+    x = x + dx;
+    =>
+    { "toktype": TOK_ID   , "value": "x" }
+    { "toktype": TOK_EQ   , "value": None }
+    { "toktype": TOK_ID   , "value": "x" }
+    { "toktype": TOK_PLUS , "value": None }
+    { "toktype": TOK_ID   , "value": "dx" }
+    { "toktype": TOK_SEMI , "value": None }
 
     alpha   ::= ['a'-'z'  'A'-'Z'  '_']
     digit   ::= ['0'-'9']

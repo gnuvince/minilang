@@ -448,81 +448,85 @@ def codegen(ast, symtab):
     Input : the AST and symbol table of a mini program
     Output: an equivalent C program
 
-    codegen(ast) will generate code in three-address code.  The code
+    codegen(ast) will generate code for our Minilang program.  The code
     is clearly not optimal, nor even really human readable, however it
     is (a) correct, and (b) translated easily.
 
     For expressions, we pass the expression to translate, and
-    gen_expr() returns two results: the name of the variable in which
-    the result should be stored and the code to compute the result.
+    gen_expr() prints the code for generating the expression
+    and returns the name of the variable in which
+    the result is stored.
+
     The new_temp() function creates a new temporary variable for every
     time it's called.
+
+    A typical code generator would return a structure that could then
+    be manipulated for analysis and optimization.
     """
     def new_temp():
+        """Return a new, unique temporary variable name."""
         global curr_tmp
         curr_tmp += 1
         return "t_" + str(curr_tmp)
 
     def gen_decl(decl):
-        return ["%s %s;" % (decl["type"], decl["id"])]
+        print("%s %s;" % (decl["type"], decl["id"]))
 
     def gen_stmt(stmt):
         if stmt["nodetype"] == AST_ASSIGN:
             if stmt["lhs"] not in symtab:
                 error("undeclared variable: %s" % stmt["lhs"])
-            expr_loc, expr_out = gen_expr(stmt["rhs"])
-            return expr_out + ["%s = %s;" % (stmt["lhs"], expr_loc)]
+            expr_loc = gen_expr(stmt["rhs"])
+            print("%s = %s;" % (stmt["lhs"], expr_loc))
         elif stmt["nodetype"] == AST_PRINT:
-            expr_loc, expr_out = gen_expr(stmt["expr"])
+            expr_loc = gen_expr(stmt["expr"])
             if stmt["expr"]["type"] == "int":
                 flag = "d"
             else:
                 flag = "f"
-            return expr_out + ['printf("%{flag}\\n", {tmp});'.format(flag=flag, tmp=expr_loc)]
+            print('printf("%%%s\\n", %s);' % (flag, expr_loc))
         elif stmt["nodetype"] == AST_READ:
             id = stmt["id"]["value"]
             if symtab[id] == "int":
                 flag = "d"
             else:
                 flag = "f"
-            return ['scanf("%%%s", &%s);' % (flag, id)]
+            print('scanf("%%%s", &%s);' % (flag, id))
         elif stmt["nodetype"] == AST_WHILE:
-            expr_loc, expr_out = gen_expr(stmt["expr"])
-            body_out = []
+            expr_loc = gen_expr(stmt["expr"])
+            print("while (%s) { " % expr_loc)
             for body_stmt in stmt["body"]:
-                body_out += gen_stmt(body_stmt)
-            return expr_out + ["while (%s) { %s }" % (expr_loc, '\n'.join(body_out + expr_out))]
+                gen_stmt(body_stmt)
+            gen_expr(stmt["expr"], expr_loc)
+            print("}")
 
-    def gen_expr(expr):
+    def gen_expr(expr, loc_name=None):
         if expr["nodetype"] in (AST_INT, AST_FLOAT):
-            loc = new_temp()
-            code = ["%s %s = %s;" % (expr["type"], loc, expr["value"])]
-            return (loc, code)
+            loc = loc_name or new_temp()
+            print("%s %s = %s;" % (expr["type"], loc, expr["value"]))
+            return loc
         elif expr["nodetype"] == AST_ID:
-            return (expr["name"], [])
+            return expr["name"]
         elif expr["nodetype"] == AST_BINOP:
-            lhs_loc, lhs_code = gen_expr(expr["lhs"])
-            rhs_loc, rhs_code = gen_expr(expr["rhs"])
+            lhs_loc = gen_expr(expr["lhs"])
+            rhs_loc = gen_expr(expr["rhs"])
             loc = new_temp()
-            code = lhs_code + rhs_code + ["%s %s = %s %s %s;" % (expr["type"], loc, lhs_loc, expr["op"], rhs_loc)]
-            return (loc, code)
-
-    output = []
+            print("%s %s = %s %s %s;" % (expr["type"], loc, lhs_loc, expr["op"], rhs_loc))
+            return loc
 
     # Add the usual C headers and main declaration.
-    output += ["#include <stdio.h>"]
-    output += ["int main(void) {"]
+    print("#include <stdio.h>")
+    print("int main(void) {")
 
     # Add the variable declarations at the beginning of main.
     for decl in ast["decls"]:
-        output += gen_decl(decl)
+        gen_decl(decl)
 
     # Add the C statements to the main function.
     for stmt in ast["stmts"]:
-        output += gen_stmt(stmt)
+        gen_stmt(stmt)
 
-    output += ["}"]
-    return output
+    print("}")
 
 
 
@@ -533,10 +537,7 @@ def main():
     ast = parse(toks)                    # tokens -> AST
     symtab = build_symtab(ast)           # AST -> symbol table
     typed_ast = typecheck(ast, symtab)   # AST * symbol table -> Typed AST
-    c_stmts = codegen(typed_ast, symtab) # Typed AST * symbol table -> C code
-
-    for stmt in c_stmts:
-        print(stmt)
+    codegen(typed_ast, symtab)  # Typed AST * symbol table -> C code
 
 
 if __name__ == "__main__":
